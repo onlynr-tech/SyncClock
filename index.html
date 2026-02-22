@@ -178,7 +178,7 @@
 <body>
     <!-- SPLASH SCREEN -->
     <div id="splash">
-        <img src="Logo SyncClockk.png" alt="SyncClock Logo" id="logo">
+        <img src="image/Logo SyncClockk.png" alt="SyncClock Logo" id="logo">
         <button id="enterBtn" onclick="enterApp()">Mulai SyncClock</button>
     </div>
     <!-- MAIN APP -->
@@ -186,7 +186,7 @@
         <div id="appContent">
 
             <h1 class="app-title">
-                <img src="Logo SyncClockk.png" alt="Logo SyncClock" class="title-logo">
+                <img src="image/Logo SyncClockk.png" alt="Logo SyncClock" class="title-logo">
                 SyncClock - Jam Digital Serentak
             </h1>
 
@@ -220,8 +220,7 @@
         let offsetHistory = [];
         let labels = [];
         const MAX_POINTS = 50;
-        
-        //Insialisasi grafik
+
         function initChart() {
             const ctx = document.getElementById("offsetChart").getContext("2d");
 
@@ -305,7 +304,7 @@
 
             // Auto-fill IP address logic
             const inputIP = document.getElementById("serverIP");
-            inputIP.value = "syncclock-production.up.railway.app"; // PASTE LINK RAILWAY DI SINI TANPA HTTPS://
+            inputIP.value = "nama-domain-railway-anda.up.railway.app";
         }
 
         function connect() {
@@ -319,18 +318,21 @@
             const ip = serverIP.value;
             let wsUrl;
 
-            // Logika Auto-Detect otomatis: Railway pakai WSS
+            // Logika Auto-Detect untuk Hosting vs Local
             if (ip.includes("railway.app")) {
+                // Gunakan wss (secure websocket) tanpa port khusus karena Railway menggunakan port web standar 443
                 wsUrl = `wss://${ip}`;
             } else if (ip === window.location.hostname) {
+                // Jika input sama dengan hostname halaman ini, gunakan protokol & port halaman ini.
                 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
                 wsUrl = `${protocol}://${window.location.host}`;
             } else {
+                // Jika manual input IP lokal, asumsi port 5001 (atau 5000)
                 wsUrl = `ws://${ip}:5001`;
             }
 
             console.log("Mencoba connect ke:", wsUrl);
-            ws = new WebSocket(wsUrl); //Koneksi WebSocket
+            ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 isConnected = true;
@@ -402,7 +404,7 @@
         function syncTime() {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 const t1 = Date.now() / 1000;
-                ws.send(`REQ|${t1}`); //
+                ws.send(`REQ|${t1}`);
             }
         }
 
