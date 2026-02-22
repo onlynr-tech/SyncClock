@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>SyncClock Web</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: #1e1f29;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            color: #e6f0ff;
+        }
+
+        #splash {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #logo {
+            width: 40vw;
+            /* responsif */
+            max-width: 420px;
+            /* batas maksimum */
+            min-width: 240px;
+            /* tidak terlalu kecil */
+            margin-bottom: 32px;
+            filter: drop-shadow(0 0 20px rgba(114, 224, 161, 0.9));
+        }
+
+        #logo {
+            animation: logoReveal 1.4s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        @keyframes logoReveal {
+            0% {
+                opacity: 0;
+                transform: scale(0.88) translateY(12px);
+            }
+
+            60% {
+                opacity: 1;
+                transform: scale(1.03);
+            }
+
+            100% {
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        #enterBtn {
+            padding: 12px 28px;
+            font-size: 15px;
+            border: none;
+            border-radius: 22px;
+            background: #72e0a1;
+            color: #1e1f29;
+            cursor: pointer;
+            margin-top: 19px;
+
+            opacity: 0;
+            animation: buttonReveal 1s ease forwards;
+            animation-delay: 0.9s;
+            transition: all 0.3s ease;
+        }
+
+        @keyframes buttonReveal {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #enterBtn:hover {
+            background: #5bcf8f;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(114, 224, 161, 0.4);
+        }
+
+        #clock {
+            font-size: 64px;
+            color: #A63830;
+            margin-top: 40px;
+        }
+
+        canvas {
+            margin: 20px auto;
+            max-width: 90%;
+        }
+
+        #status {
+            margin-top: 10px;
+            color: #ffd166;
+        }
+
+        #clients {
+            margin-top: 6px;
+            color: #cfe8ff;
+            font-size: 14px;
+        }
+
+        #info {
+            margin-top: 10px;
+        }
+
+        #appContent {
+            opacity: 0;
+        }
+
+        .fade-in {
+            animation: appIn 0.8s cubic-bezier(.4, 0, .2, 1) forwards;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin-top: 20px;
+        }
+
+        /* Animasi keluar splash */
+        .fade-out {
+            animation: splashOut 0.8s ease forwards;
+        }
+
+        /* Animasi masuk app */
+        .fade-in {
+            animation: appIn 0.8s ease forwards;
+        }
+
+        @keyframes splashOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+        }
+
+        @keyframes appIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .app-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .title-logo {
+            height: 72px;
+            width: auto;
+            filter: drop-shadow(0 0 8px rgba(114, 224, 161, 0.6));
+        }
+    </style>
+</head>
+
+<body>
+    <!-- SPLASH SCREEN -->
+    <div id="splash">
+        <img src="image/Logo SyncClockk.png" alt="SyncClock Logo" id="logo">
+        <button id="enterBtn" onclick="enterApp()">Mulai SyncClock</button>
+    </div>
+    <!-- MAIN APP -->
+    <div id="app" style="display:none;">
+        <div id="appContent">
+
+            <h1 class="app-title">
+                <img src="image/Logo SyncClockk.png" alt="Logo SyncClock" class="title-logo">
+                SyncClock - Jam Digital Serentak
+            </h1>
+
+            <div id="clock">--:--:--</div>
+            <div id="status">Disconnected</div>
+            <div id="clients">👥 Client aktif: 0</div>
+            <div id="info">Offset: -- ms | Delay: -- ms</div>
+
+            <canvas id="offsetChart" width="500" height="250"
+                style="background:#ffffff; border-radius:5px; padding:10px;">
+            </canvas>
+
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="serverIP" placeholder="IP Address Server (ex: 192.168.1.5)"
+                    style="padding: 8px; border-radius: 5px; border: 1px solid #72e0a1; background: #2a2b36; color: white; width: 200px; text-align: center;">
+            </div>
+
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button onclick="quitApp()" style="margin-left:10px;">Quit</button>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let syncInterval = null;
+        let offset = 0;
+        let offsetChart = null;
+        let isConnecting = false; // sedang proses connect
+        let isConnected = false;  // sudah terkoneksi
+
+        let offsetHistory = [];
+        let labels = [];
+        const MAX_POINTS = 50;
+        
+        //Insialisasi grafik
+        function initChart() {
+            const ctx = document.getElementById("offsetChart").getContext("2d");
+
+            offsetChart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Offset (ms)",
+                        data: offsetHistory,
+                        borderColor: "#72e0a1",
+                        backgroundColor: "rgba(30,144,255,0.15)",
+                        borderWidth: 3,
+                        pointRadius: 3,
+                        pointBackgroundColor: "#1e90ff",
+                        tension: 0.3,
+                        fill: false
+                    }]
+                },
+                options: {
+                    animation: false,
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: "#000"
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: {
+                                color: "#ddd"
+                            },
+                            ticks: {
+                                color: "#000"
+                            },
+                            title: {
+                                display: true,
+                                text: "Milliseconds (ms)"
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: "#eee"
+                            },
+                            ticks: {
+                                color: "#000"
+                            },
+                            title: {
+                                display: true,
+                                text: "Sample",
+                                color: "#000"
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function enterApp() {
+            const splash = document.getElementById("splash");
+            const app = document.getElementById("app");
+
+            // animasi keluar splash
+            splash.classList.add("fade-out");
+
+            setTimeout(() => {
+                splash.style.display = "none";
+
+                // tampilkan app + animasi masuk
+                app.style.display = "block";
+                document.getElementById("appContent").classList.add("fade-in");
+
+                // init chart setelah app benar-benar tampil
+                setTimeout(() => {
+                    initChart();
+                }, 200);
+
+            }, 800); // HARUS sama dengan durasi animasi splashOut
+
+            // Auto-fill IP address logic
+            const inputIP = document.getElementById("serverIP");
+            if (window.location.hostname && window.location.hostname !== "") {
+                inputIP.value = window.location.hostname;
+            } else {
+                inputIP.value = "localhost";
+            }
+        }
+
+        function connect() {
+
+            // Cegah klik ganda
+            if (isConnecting || isConnected) return;
+
+            isConnecting = true;
+            document.getElementById("connectBtn").disabled = true;
+
+            const ip = serverIP.value;
+            let wsUrl;
+
+            // Logika Auto-Detect untuk Hosting vs Local
+            // Jika input sama dengan hostname halaman ini, gunakan protokol & port halaman ini.
+            if (ip === window.location.hostname) {
+                const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                wsUrl = `${protocol}://${window.location.host}`;
+            } else {
+                // Jika manual input IP lain, asumsi mode dev/local di port 5000
+                wsUrl = `ws://${ip}:5000`;
+            }
+
+            console.log("Mencoba connect ke:", wsUrl);
+            ws = new WebSocket(wsUrl); //Koneksi WebSocket
+
+            ws.onopen = () => {
+                isConnected = true;
+                isConnecting = false;
+
+                document.getElementById("status").innerText = "Connected";
+                document.getElementById("connectBtn").disabled = true;
+
+                //Ubah warna jam jadi hijau
+                document.getElementById("clock").style.color = "#72e0a1";
+
+                syncInterval = setInterval(syncTime, 1000);
+            };
+
+            ws.onmessage = (event) => {
+                const data = event.data;
+                console.log("📩 WS RECEIVED:", event.data);
+
+                if (data.startsWith("CLIENTS|")) {
+                    const total = data.split("|")[1];
+                    document.getElementById("clients").innerText =
+                        `👥 Client aktif: ${total}`;
+                    return;
+                }
+
+                if (data.startsWith("RESP|")) {
+                    const parts = data.split("|");
+                    const t1 = parseFloat(parts[1]);
+                    const t2 = parseFloat(parts[2]);
+                    const t3 = parseFloat(parts[3]);
+                    const t4 = Date.now() / 1000;
+
+                    offset = ((t2 - t1) + (t3 - t4)) / 2;
+                    const delay = (t4 - t1) - (t3 - t2);
+
+                    const offsetMs = offset * 1000;
+
+                    document.getElementById("info").innerText =
+                        `Offset: ${offsetMs.toFixed(1)} ms | Delay: ${(delay * 1000).toFixed(1)} ms`;
+
+                    //update grafik
+                    offsetHistory.push(offset * 1000);
+                    labels.push(labels.length);
+
+                    if (offsetHistory.length > MAX_POINTS) {
+                        offsetHistory.shift();
+                        labels.shift();
+                    }
+
+                    if (offsetChart) {
+                        offsetChart.update();
+                    }
+                };
+            }
+
+            ws.onclose = () => {
+                isConnected = false;
+                isConnecting = false;
+
+                document.getElementById("status").innerText = "Disconnected";
+                document.getElementById("connectBtn").disabled = false;
+
+                // Jam kembali merah
+                document.getElementById("clock").style.color = "#ff4d4d";
+            };
+
+        }
+
+        function syncTime() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const t1 = Date.now() / 1000;
+                ws.send(`REQ|${t1}`); //
+            }
+        }
+
+        function updateClock() {
+            const now = new Date(Date.now() + offset * 1000);
+            document.getElementById("clock").innerText =
+                now.toLocaleTimeString("id-ID").replace(/\./g, ":");
+        }
+
+        let clockInterval = setInterval(updateClock, 200);
+
+        function quitApp() {
+            //hentikan interval
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+
+            //tutup websocket
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+
+            offset = 0;
+
+            document.getElementById("status").innerText = "Disconnected";
+            document.getElementById("clients").innerText = "👥 Client aktif: 0";
+            document.getElementById("clock").innerText = "--:--:--";
+            document.getElementById("info").innerText = "Offset: -- ms | Delay: -- ms";
+
+            isConnected = false;
+            isConnecting = false;
+
+            document.getElementById("connectBtn").disabled = false;
+            document.getElementById("clock").style.color = "#ff4d4d";
+
+            offsetHistory.length = 0;
+            labels.length = 0;
+            if (offsetChart) {
+                offsetChart.update();
+            }
+
+            console.log("🚪 Quit berhasil — semua proses dihentikan");
+        }
+    </script>
+</body>
+
+</html>
