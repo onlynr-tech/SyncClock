@@ -303,14 +303,9 @@
 
             }, 800); // HARUS sama dengan durasi animasi splashOut
 
-            // Auto-fill IP address logic
-            const inputIP = document.getElementById("serverIP");
-            if (window.location.hostname && window.location.hostname !== "") {
-                inputIP.value = window.location.hostname;
-            } else {
-                inputIP.value = "localhost";
-            }
-        }
+        // Auto-fill IP address logic
+        const inputIP = document.getElementById("serverIP");
+        inputIP.value = "syncclock-production.up.railway.app"; // PASTE LINK RAILWAY DI SINI TANPA HTTPS://
 
         function connect() {
 
