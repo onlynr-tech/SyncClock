@@ -319,14 +319,14 @@
             const ip = serverIP.value;
             let wsUrl;
 
-            // Logika Auto-Detect untuk Hosting vs Local
-            // Jika input sama dengan hostname halaman ini, gunakan protokol & port halaman ini.
-            if (ip === window.location.hostname) {
+            // Logika Auto-Detect otomatis: Railway pakai WSS
+            if (ip.includes("railway.app")) {
+                wsUrl = `wss://${ip}`;
+            } else if (ip === window.location.hostname) {
                 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
                 wsUrl = `${protocol}://${window.location.host}`;
             } else {
-                // Jika manual input IP lain, asumsi mode dev/local di port 5000
-                wsUrl = `ws://${ip}:5000`;
+                wsUrl = `ws://${ip}:5001`;
             }
 
             console.log("Mencoba connect ke:", wsUrl);
